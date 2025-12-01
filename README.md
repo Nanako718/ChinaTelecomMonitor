@@ -1,75 +1,54 @@
 # ChinaTelecomMonitor
 
-中国电信 话费、通话、流量 套餐用量监控。
+> 中国电信话费、通话、流量套餐用量查询 API 服务
 
-本项目是部署在服务器（或x86软路由等设备）使用接口模拟登录，定时获取电信手机话费、通话、流量使用情况，推送到各种通知渠道提醒。
+本项目通过模拟登录中国电信接口，获取手机话费、通话时长、流量使用情况等数据。可部署在服务器、x86软路由等设备上运行，为第三方系统提供数据查询接口。
 
-## 特性
+## 📋 目录
 
-- [x] 支持青龙（定时监控 + 推送通知）
-- [x] 支持通过 json push_config 字段独立配置通知渠道（仅限青龙监控脚本）
-- [x] 本地保存登录 token ，有效期内不重复登录
-- [x] Docker 独立部署 API 查询服务（纯查询功能，无推送通知）
+- [特性](#-特性)
+- [使用案例](#-使用案例)
+- [快速开始](#-快速开始)
+  - [Docker 部署](#docker-部署)
+- [API 文档](#-api-文档)
+- [常见问题](#-常见问题)
+- [致谢](#-致谢)
 
-## 使用案例
+## ✨ 特性
 
-- [提供一个ios的自制UI面板](https://github.com/Cp0204/ChinaTelecomMonitor/issues/18) --- By: LRZ9712
-- [HomeAssistant插件集成](https://bbs.hassbian.com/thread-29129-1-1.html) [CTM电信](https://github.com/hlhk2017/ChinaTelecomMonitor-Homeassistant-Integration)  --- By: hlhk2017
-- [Homeassistant中国电信接入，视频教程](https://www.bilibili.com/video/BV1F5NLe7EUJ/) --- By: 米哟MIO
+- ✅ **Token 缓存机制** - 本地保存登录 token，有效期内自动复用，避免重复登录
+- ✅ **Docker 部署** - 一键部署 API 查询服务
+- ✅ **RESTful API** - 提供标准 REST API，方便第三方系统集成
+- ✅ **高并发支持** - 支持多线程并发查询，性能稳定
+- ✅ **数据持久化** - 登录信息持久化存储，容器重启后数据不丢失
 
-## 部署
+## 🎯 使用案例
 
-### 青龙监控
+- [iOS 自制 UI 面板](https://github.com/Cp0204/ChinaTelecomMonitor/issues/18) - By: LRZ9712
+- [HomeAssistant 插件集成](https://bbs.hassbian.com/thread-29129-1-1.html) [CTM电信](https://github.com/hlhk2017/ChinaTelecomMonitor-Homeassistant-Integration) - By: hlhk2017
+- [HomeAssistant 中国电信接入视频教程](https://www.bilibili.com/video/BV1F5NLe7EUJ/) - By: 米哟MIO
 
-拉库命令：
+## 🚀 快速开始
 
-```
-ql repo https://github.com/Cp0204/ChinaTelecomMonitor.git "telecom_monitor" "" "telecom_class|notify"
-```
+### Docker 部署
 
-| 环境变量               | 示例                  | 备注                                          |
-| ---------------------- | --------------------- | --------------------------------------------- |
-| `TELECOM_USER`         | `18912345678password` | 手机号密码直接拼接，密码为6位数字，会自动截取 |
-| `TELECOM_FLUX_PACKAGE` | `true` (默认)         | 推送流量包明细，`false` 则只推送基本信息      |
+本项目提供 Docker 容器化部署方案，方便快速部署和使用。API 服务主要用于第三方系统（如 HomeAssistant 等）获取电信套餐使用信息。
 
-推送内容示例：
+> ⚠️ **安全警告**
+> 
+> 登录成功后，会在服务器 `config/login_info.db` (SQLite 数据库) 中**记录账号包括 token 在内的敏感信息**。token 长期有效，直到在其他地方登录被挤下线。程序获取数据时会先尝试用已记录的 token 去请求，避免重复发出登录请求。
+> 
+> **⚠️ 请勿使用他人部署的 API 服务，以免敏感信息外泄 ⚠️**
 
-```txt
-【电信套餐用量监控】
+#### 构建 Docker 镜像
 
-📱 手机：18912345678
-💰 余额：10.0
-📞 通话：38 / 1500 min
-🌐 总流量
-  - 通用：10.14 / 30.0 GB 🟢
-  - 专用：0.85 / 200.0 GB
+在项目根目录执行以下命令构建镜像（支持跨平台构建，适用于 Mac 构建 x86 镜像）：
 
-【流量包明细】
-
-🇨🇳国内通用流量
-🔹[5G畅享融合xx套餐-国内通用流量]已用10.14GB/共30.00GB
-
-📺专用流量
-🔹[定向流量包]已用872.87MB/共200.00GB
+```bash
+docker build --platform linux/amd64 -t dtzsghnr/chinatelecommonitor:latest .
 ```
 
-| 图标 | 状态说明            | 举例 (当月共30天，今天10号) |
-| ---- | ------------------- | --------------------------- |
-| 🟢    | 均匀使用范围内      | 总流量30GB，已用<10GB       |
-| 🟡    | 已超过均匀用量 <50% | 总流量30GB，10GB<已用<15GB  |
-| 🟠    | 已超过均匀用量 >50% | 总流量30GB，15GB<已用<30GB  |
-| 🔴    | 已超流量            | 总流量30GB，已用>30GB       |
-| ⚫    | 无流量              | 总流量=0                    |
-
-
-### Docker API 服务
-
-Docker 部署的是**纯查询 API 服务**，不包含任何推送通知功能，主要用于第三方（如 HomeAssistant 等）获取信息，数据原样返回。仅提供查询接口，不支持监控提醒功能。
-
-> [!WARNING]
-> **警告：** 登录成功后，会在服务器 `config/login_info.db` (SQLite 数据库) 中**记录账号包括 token 在内的敏感信息**，token 长期有效，直到在其他地方登录被挤下线，程序获取数据时会先尝试用已记录的 token 去请求，避免重复发出登录请求。**⚠️请勿使用他人部署的 API 服务，以免敏感信息外泄⚠️**
-
-部署命令：
+#### 使用 Docker 命令部署
 
 ```bash
 # 创建本地数据目录（用于持久化数据库和配置）
@@ -82,16 +61,18 @@ docker run -d \
   -v $(pwd)/china-telecom-monitor/config:/app/config \
   --network bridge \
   --restart unless-stopped \
-  cp0204/chinatelecommonitor:main
+  dtzsghnr/chinatelecommonitor:latest
 ```
 
-docker-compose.yml：
+#### 使用 Docker Compose 部署
+
+创建 `docker-compose.yml` 文件：
 
 ```yaml
 name: china-telecom-monitor
 services:
   china-telecom-monitor:
-    image: cp0204/chinatelecommonitor:main
+    image: dtzsghnr/chinatelecommonitor:latest
     container_name: china-telecom-monitor
     network_mode: bridge
     ports:
@@ -103,56 +84,80 @@ services:
     restart: unless-stopped
 ```
 
-> **数据持久化说明：** 
-> - 通过 `-v` 参数将容器的 `/app/config` 目录挂载到本地目录
-> - 数据库文件 `login_info.db` 会保存在本地，容器删除重建后数据不会丢失
-> - 建议将 `./china-telecom-monitor/config` 目录备份，包含重要的登录 token 信息
+然后运行：
+
+```bash
+docker-compose up -d
+```
+
+#### 数据持久化说明
+
+- 通过 `-v` 参数将容器的 `/app/config` 目录挂载到本地目录
+- 数据库文件 `login_info.db` 会保存在本地，容器删除重建后数据不会丢失
+- **建议定期备份** `./china-telecom-monitor/config` 目录，包含重要的登录 token 信息
 
 
-#### 接口URL
+## 📖 API 文档
 
-- `http://127.0.0.1:10000/login`
+所有接口均支持 `GET` 和 `POST` 方法，默认端口为 `10000`。
 
-  登录，返回用户信息；无须单独请求，请求以下接口时，如未登录会自动登录
+### 接口列表
 
-- `http://127.0.0.1:10000/qryImportantData`
+| 接口路径 | 说明 | 备注 |
+| -------- | ---- | ---- |
+| `/login` | 登录接口 | 返回用户信息；无需单独请求，其他接口未登录时会自动登录 |
+| `/qryImportantData` | 查询主要信息 | 返回话费、通话、流量等总用量信息 |
+| `/userFluxPackage` | 查询流量包明细 | 返回详细的流量包使用情况 |
+| `/qryShareUsage` | 查询共享套餐 | 返回共享套餐各号码用量 |
+| `/summary` | 简化数据接口 | `/qryImportantData` 的简化版本，返回格式化的数据 |
 
-  返回主要信息，总用量 话费、通话、流量 等
+### 请求方式
 
-- `http://127.0.0.1:10000/userFluxPackage`
+#### GET 请求示例
 
-  返回流量包明细
+```bash
+# 使用 URL 参数
+curl "http://127.0.0.1:10000/summary?phonenum=18912345678&password=123456"
+```
 
-- `http://127.0.0.1:10000/qryShareUsage`
+#### POST 请求示例
 
-  返回共享套餐各号码用量
+```bash
+curl --request POST \
+  --url http://127.0.0.1:10000/summary \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "phonenum": "18912345678",
+    "password": "123456"
+  }'
+```
 
-- `http://127.0.0.1:10000/summary`
+### 响应格式
 
-  `/qryImportantData` 的数据简化接口，非原样返回，简化后返回格式：
+#### `/summary` 接口响应示例
 
 ```json
 {
-  "phonenum": "18912345678", // 手机号码
-  "balance": 0,              // 账户余额（分）
-  "voiceUsage": 39,          // 语音通话-已使用时长（分钟）
-  "voiceBalance": 2211,      // 语音通话-剩余时长（分）
-  "voiceTotal": 2250,        // 语音通话-总时长（分钟）
-  "flowUse": 7366923,        // 总流量-已使用量（KB）
-  "flowTotal": 7366923,      // 总流量-总量（KB）
-  "flowOver": 222222,        // 总流量-超量（KB）
-  "commonUse": 7273962,      // 通用流量-已使用量（KB）
-  "commonTotal": 25550446,   // 通用流量-总量（KB）
-  "commonOver": 222222,      // 通用流量-超量（KB）
-  "specialUse": 92961,       // 专用流量-已使用量（KB）
-  "specialTotal": 215265280, // 专用流量-总量（KB）
-  "createTime": "2024-05-12 14:13:28", // 数据创建时间
-  "flowItems": [             // 流量类型列表
+  "phonenum": "18912345678",
+  "balance": 0,
+  "voiceUsage": 39,
+  "voiceBalance": 2211,
+  "voiceTotal": 2250,
+  "flowUse": 7366923,
+  "flowTotal": 7366923,
+  "flowOver": 222222,
+  "commonUse": 7273962,
+  "commonTotal": 25550446,
+  "commonOver": 222222,
+  "specialUse": 92961,
+  "specialTotal": 215265280,
+  "createTime": "2024-05-12 14:13:28",
+  "flowItems": [
     {
-      "name": "国内通用流量(达量降速)", // 流量类型名称
-      "use": 10241024,                // 流量包-已使用量（KB）
-      "balance": 0,                   // 流量包-剩余量（KB），当为负值时则是超流量
-      "total": 10241024               // 流量包-总量（KB）
+      "name": "国内通用流量(达量降速)",
+      "use": 10241024,
+      "balance": 0,
+      "total": 10241024
     },
     {
       "name": "国内通用流量(非畅享)",
@@ -170,24 +175,53 @@ services:
 }
 ```
 
-接口均支持 POST 和 GET 方法，如 GET ：
+#### 字段说明
 
-```
-http://127.0.0.1:10000/summary?phonenum=18912345678&password=123456
-```
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| `phonenum` | string | 手机号码 |
+| `balance` | number | 账户余额（单位：分） |
+| `voiceUsage` | number | 语音通话已使用时长（单位：分钟） |
+| `voiceBalance` | number | 语音通话剩余时长（单位：分钟） |
+| `voiceTotal` | number | 语音通话总时长（单位：分钟） |
+| `flowUse` | number | 总流量已使用量（单位：KB） |
+| `flowTotal` | number | 总流量总量（单位：KB） |
+| `flowOver` | number | 总流量超量（单位：KB） |
+| `commonUse` | number | 通用流量已使用量（单位：KB） |
+| `commonTotal` | number | 通用流量总量（单位：KB） |
+| `commonOver` | number | 通用流量超量（单位：KB） |
+| `specialUse` | number | 专用流量已使用量（单位：KB） |
+| `specialTotal` | number | 专用流量总量（单位：KB） |
+| `createTime` | string | 数据创建时间 |
+| `flowItems` | array | 流量类型列表，包含各流量包的详细信息 |
 
-POST 时 Body 须为 json 数据，如：
+## ❓ 常见问题
+
+### 1. 登录失败怎么办？
+
+- 检查手机号和密码是否正确
+- 确认账号未被其他设备登录（会被挤下线）
+- 如果 token 过期，程序会自动重新登录
+
+### 2. 如何查看数据库中的登录信息？
+
+可以使用项目提供的 `view_db.py` 脚本查看：
 
 ```bash
-curl --request POST \
-  --url http://127.0.0.1:10000/summary \
-  --header 'Content-Type: application/json' \
-  --data '{"phonenum": "18912345678","password": "123456"}'
+python view_db.py
 ```
 
-## 感谢
+### 3. 数据持久化在哪里？
+
+数据保存在 `./china-telecom-monitor/config/login_info.db` 文件中，包含登录 token 等敏感信息，请妥善保管。
+
+### 4. 支持多账号吗？
+
+支持。每个账号的登录信息会分别存储在数据库中，通过 `phonenum` 参数区分。
+
+## 🙏 致谢
 
 本项目大量参考其他项目的代码，在此表示感谢！
 
-- [ChinaTelecomMonitor](https://github.com/LambdaExpression/ChinaTelecomMonitor) : go 语言的实现
-- [boxjs](https://github.com/gsons/boxjs) : 感谢开源提供的电信接口
+- [ChinaTelecomMonitor](https://github.com/LambdaExpression/ChinaTelecomMonitor) - Go 语言实现版本
+- [boxjs](https://github.com/gsons/boxjs) - 感谢开源提供的电信接口

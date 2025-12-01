@@ -1,0 +1,22 @@
+# 排除配置文件目录（包含 SQLite 数据库）
+config/
+*.db
+*.db-shm
+*.db-wal
+
+# 排除 Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 排除其他不需要的文件
+.git/
+.gitignore
+*.md
+LICENSE
+.env
+.venv/
+venv/
+
