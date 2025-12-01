@@ -6,10 +6,10 @@
 
 ## 特性
 
-- [x] 支持青龙
-- [x] 支持通过 json push_config 字段独立配置通知渠道
+- [x] 支持青龙（定时监控 + 推送通知）
+- [x] 支持通过 json push_config 字段独立配置通知渠道（仅限青龙监控脚本）
 - [x] 本地保存登录 token ，有效期内不重复登录
-- [x] Docker 独立部署 API 查询服务
+- [x] Docker 独立部署 API 查询服务（纯查询功能，无推送通知）
 
 ## 使用案例
 
@@ -64,19 +64,22 @@ ql repo https://github.com/Cp0204/ChinaTelecomMonitor.git "telecom_monitor" "" "
 
 ### Docker API 服务
 
-Docker 部署的是 API 服务，没有监控提醒功能，主要是用于第三方（如 HomeAssistant 等）获取信息，数据原样返回。
+Docker 部署的是**纯查询 API 服务**，不包含任何推送通知功能，主要用于第三方（如 HomeAssistant 等）获取信息，数据原样返回。仅提供查询接口，不支持监控提醒功能。
 
 > [!WARNING]
-> **警告：** 登录成功后，会在服务器 config/login_info.json 中**记录账号包括 token 在内的敏感信息**，token 长期有效，直到在其他地方登录被挤下线，程序获取数据时会先尝试用已记录的 token 去请求，避免重复发出登录请求。**⚠️请勿使用他人部署的 API 服务，以免敏感信息外泄⚠️**
+> **警告：** 登录成功后，会在服务器 `config/login_info.db` (SQLite 数据库) 中**记录账号包括 token 在内的敏感信息**，token 长期有效，直到在其他地方登录被挤下线，程序获取数据时会先尝试用已记录的 token 去请求，避免重复发出登录请求。**⚠️请勿使用他人部署的 API 服务，以免敏感信息外泄⚠️**
 
 部署命令：
 
 ```bash
+# 创建本地数据目录（用于持久化数据库和配置）
+mkdir -p ./china-telecom-monitor/config
+
+# 运行容器（数据持久化到本地 ./china-telecom-monitor/config 目录）
 docker run -d \
   --name china-telecom-monitor \
   -p 10000:10000 \
-  -v ./china-telecom-monitor/config:/app/config \
-  -e WHITELIST_NUM= \
+  -v $(pwd)/china-telecom-monitor/config:/app/config \
   --network bridge \
   --restart unless-stopped \
   cp0204/chinatelecommonitor:main
@@ -94,15 +97,17 @@ services:
     ports:
       - 10000:10000
     volumes:
+      # 数据持久化：将容器内的 /app/config 目录挂载到本地
+      # 数据库文件 login_info.db 会保存在本地，容器重启后数据不丢失
       - ./china-telecom-monitor/config:/app/config
-    environment:
-      - WHITELIST_NUM=
     restart: unless-stopped
 ```
 
-| 环境变量        | 示例                      | 备注         |
-| --------------- | ------------------------- | ------------ |
-| `WHITELIST_NUM` | `18912345678,13312345678` | 手机号白名单 |
+> **数据持久化说明：** 
+> - 通过 `-v` 参数将容器的 `/app/config` 目录挂载到本地目录
+> - 数据库文件 `login_info.db` 会保存在本地，容器删除重建后数据不会丢失
+> - 建议将 `./china-telecom-monitor/config` 目录备份，包含重要的登录 token 信息
+
 
 #### 接口URL
 
